@@ -1,12 +1,9 @@
 """
-My initial implementation. 
-- WriterBase implements the common interface.
-- Each of it's subclass implements the concrete implementation. 
-- The creater class chooses the type of writer and returns it. 
-- export function has the export workflow. 
-
-My analysis: 
-- This implementation is good but can we combine the export function and the creator?
+This version: 
+1. Writer and Exporter Bases implement the structure for the concrete classes. 
+2. CsvExporter and XlsxExporter should initialize the CsvWriter and XlsxWriter classes. 
+3. These classes can either implement their own export workflow or keep the base export algorithm. 
+4. Assume in the future the user wants to print on screen, I can implement a screen writer.
 """
 
 from abc import ABC, abstractmethod
@@ -70,23 +67,33 @@ class XlsxWriter(WriterBase):
         raise NotImplementedError
 
 
-class Creator:
-    @classmethod
-    def create(cls, writer_type) -> WriterBase:
-        if writer_type == "CSV":
-            return CsvWriter()
-        elif writer_type == "XLSX":
-            return XlsxWriter()
-        else:
-            raise NotImplementedError(f"Unknown writer type")
+class ExporterBase(ABC):
+    @abstractmethod
+    def create_writer(self) -> WriterBase
+        pass
+
+    def export(self, target, data, metadata, stats) -> None:
+        exporter = self.create_writer()
+        exporter.open(target)
+        exporter.writeHeader(metadata)
+        for row in data:
+            exporter.writeRow(row)
+        exporter.writeFooter(stats)
+        exporter.close()
+
+class CsvExporter(ExporterBase):
+    def create_writer(self) -> WriterBase:
+        return CsvWriter()
+    
+class XlsxExporter(ExporterBase):
+    def create_writer(self) -> WriterBase:
+        return XlsxWriter()
 
 
+def main():
+    exporter = CsvExporter()
+    exporter.export("", [], [], [])
 
-def export(export_type, data, target, metadata, stats):
-    exporter = Creator.create(export_type)
-    exporter.open(target)
-    exporter.writeHeader(metadata)
-    for row in data:
-        exporter.writeRow(row)
-    exporter.writeFooter(stats)
-    exporter.close()
+
+if __name__ == "__main__":
+    main()
