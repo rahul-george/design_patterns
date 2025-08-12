@@ -11,75 +11,80 @@ from abc import ABC, abstractmethod
 
 class WriterBase(ABC):
     def __init__(self) -> None:
-        pass
+        print("WriterBase initialized")
 
     @abstractmethod
     def open(self, target):
-        pass
+        print("WriterBase opened")
 
     @abstractmethod
     def writeHeader(self, metadata):
-        pass
+        print("WriterBase header written")
     
     @abstractmethod
     def writeRow(self, row):
-        pass
+        print("WriterBase row written")
     
     @abstractmethod
     def writeFooter(self, stats):
-        pass
+        print("WriterBase footer written")
 
     @abstractmethod
     def close(self):
-        pass
+        print("WriterBase closed")
 
 class CsvWriter(WriterBase):
     def open(self, target):
-        raise NotImplementedError
+        print("CSV Writer opened target")
 
     def writeHeader(self, metadata):
-        raise NotImplementedError
+        print("CSV Writer written header")
 
     def writeRow(self, row):
-        raise NotImplementedError
+        print("CSV Writer row written")
 
     def writeFooter(self, stats):
-        raise NotImplementedError
+        print("CSV Writer footer written")
 
     def close(self):
-        raise NotImplementedError
+        print("CSV Writer closed")
 
 
 class XlsxWriter(WriterBase):
     def open(self, target):
-        raise NotImplementedError
+        print("XLSX Writter opened")
 
     def writeHeader(self, metadata):
-        raise NotImplementedError
+        print("XLSX Writer written header")
 
     def writeRow(self, row):
-        raise NotImplementedError
+        print("XLSX Writer row written")
 
     def writeFooter(self, stats):
-        raise NotImplementedError
+        print("XLSX Writer footer written")
 
     def close(self):
-        raise NotImplementedError
+        print("XLSX Writer closed")
 
 
 class ExporterBase(ABC):
     @abstractmethod
-    def create_writer(self) -> WriterBase
+    def create_writer(self) -> WriterBase:
         pass
 
     def export(self, target, data, metadata, stats) -> None:
         exporter = self.create_writer()
-        exporter.open(target)
-        exporter.writeHeader(metadata)
-        for row in data:
-            exporter.writeRow(row)
-        exporter.writeFooter(stats)
-        exporter.close()
+        try:
+            exporter.open(target)
+            exporter.writeHeader(metadata)
+            for row in data:
+                exporter.writeRow(row)
+            exporter.writeFooter(stats)
+        except Exception as e:
+            print(e)
+            print("Exporter ran into error")
+        finally:
+            exporter.close()
 
 class CsvExporter(ExporterBase):
     def create_writer(self) -> WriterBase:
@@ -92,7 +97,7 @@ class XlsxExporter(ExporterBase):
 
 def main():
     exporter = CsvExporter()
-    exporter.export("", [], [], [])
+    exporter.export("", ['a', 'b'], [], [])
 
 
 if __name__ == "__main__":

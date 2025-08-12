@@ -52,7 +52,3 @@ You’re building the export module for a SaaS analytics platform. Users can exp
 - Exporter should be unaware of concrete writer classes.
 - Demo should show exporting the same dataset to multiple formats using identical workflow.
 - Logs or output summary must confirm headers, rows, and footer written via correct writer.
-
----
-
-Let your code do the storytelling! Paste your solution once ready and I’ll be all eyes. 👀
