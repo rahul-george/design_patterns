@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+import random
+import time
 
 # ------ Sender classes responsible for sending the SMS. ---------
 
@@ -76,6 +78,7 @@ class FallbackNotifictionManager:
         self._managers = managers
 
     def _notify_with_simple_retry(self, mgr, recipient, message):
+        print('Using notify with simple retry algorithm')
         attempt = 0
         sender: NotificationSender = mgr.create_sender()
 
@@ -92,10 +95,33 @@ class FallbackNotifictionManager:
         # If it comes here, it means it did not return
         raise RetryFailedError("Out of retries")
     
+    def _notify_with_exponential_backoff_retry(self, mgr, recipient, message):
+        print('Using notify with exponential back off retry with jitter algorithm')
+        attempt = 0
+        sender: NotificationSender = mgr.create_sender()
+
+        while attempt < sender.retry_count:
+            try:
+                attempt += 1
+                sender.send(recipient, message)
+                return
+            except NotificationSenderError as err:
+                # You can also create two classes one for retriable errors 
+                # and another for permanent errors
+                print(f"Attempt {attempt}/{sender.retry_count}. Retrying...")
+                
+                remaining = sender.retry_count - attempt
+                if remaining:
+                    time.sleep(min(2**attempt, 8) + random.random())
+        
+        # If it comes here, it means it did not return
+        raise RetryFailedError("Out of retries")
+    
     def notify(self, recipient, message):
         for mgr in self._managers:
             try:
-                self._notify_with_simple_retry(mgr, recipient, message)
+                # self._notify_with_simple_retry(mgr, recipient, message)
+                self._notify_with_exponential_backoff_retry(mgr, recipient, message)
                 return 
             except RetryFailedError as err:
                 print(err)
