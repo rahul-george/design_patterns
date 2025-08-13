@@ -95,7 +95,7 @@ class FallbackNotifictionManager:
     def notify(self, recipient, message):
         for mgr in self._managers:
             try:
-                self._notify_with_retry(mgr, recipient, message)
+                self._notify_with_simple_retry(mgr, recipient, message)
                 return 
             except RetryFailedError as err:
                 print(err)
