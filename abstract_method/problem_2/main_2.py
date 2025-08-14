@@ -58,7 +58,7 @@ class SmsSender(NotificationSender):
         print("SMS Sent")
     
 
-class NotificationManager:
+class NotificationManager(ABC):
     @abstractmethod
     def create_sender(self) -> NotificationSender:
         """Override the create sender in the specific manager classes to create it's instance. 
