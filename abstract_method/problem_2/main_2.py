@@ -44,6 +44,7 @@ class EmailSender(NotificationSender):
         pass
 
     def send(self, recipient: str, message: str) -> None:
+        generate_response(1)
         print("Email Sent")
     
 
@@ -53,13 +54,11 @@ class SmsSender(NotificationSender):
         pass
 
     def send(self, recipient: str, message: str) -> None:
+        generate_response(0)
         print("SMS Sent")
     
 
 class NotificationManager:
-    def __init__(self) -> None:
-        pass
-
     @abstractmethod
     def create_sender(self) -> NotificationSender:
         """Override the create sender in the specific manager classes to create it's instance. 
@@ -100,11 +99,35 @@ class SmsNotificationMgr(NotificationManager):
         sms_gateway = ''
         api_key = ''
         return SmsSender(sms_gateway, api_key)
+
+class FallbackNotificationMgr:
+    def __init__(self, managers: list[NotificationManager]) -> None:
+        self._managers = managers
+    
+    def notify(self, recipient: str, message: str):
+
+        for mgr in self._managers:
+            sender = mgr.create_sender()
+            print(f"Attempting to send via {sender.__class__.__name__}")
+
+            attempt = 0
+            while attempt < sender.max_retry_count:
+                try:
+                    sender.send(recipient, message)
+                    return
+                except TransientError as err:
+                    attempt += 1
+                    print("Ran into a temporary error")
+                    print(f"Retrying {attempt}/{sender.max_retry_count} times.. ")
+            
+            print("Exhausted all retry attempts")
+        raise PermanentError("All notification channels failed.")
         
 
 def notify(recipient, message):
     """Use the notify function directly in other places"""
-    notification_mgr = SmsNotificationMgr()
+    notification_mgr = FallbackNotificationMgr([EmailNotificationMgr(), 
+                                                SmsNotificationMgr()])
     notification_mgr.notify(recipient, message)
 
 
