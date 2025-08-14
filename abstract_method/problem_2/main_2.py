@@ -2,7 +2,10 @@
 Goal: 
 1. Implement a notification system. 
 2. The notification system uses email as the notification channel. 
-3. If certain type of errors occur, the system should retry. 
+3. If certain type of errors occur, the system should retry.
+4. Add new notification channel - SMS 
+5. SMS notification channel also should have a retry. 
+6. retry is channel specific. 
 """
 import random
 
@@ -34,8 +37,28 @@ class EmailSender():
         attempt = 0
         while attempt < self.max_retry_count:
             try:
-                generate_response(2)
+                generate_response(1)
                 print("Email Sent")
+                return
+            except TransientError as err:
+                attempt += 1
+                print("Ran into a temporary error")
+                print(f"Retrying {attempt}/{self.max_retry_count} times.. ")
+        
+        raise RetryFailedError("Exhausted all retry attempts")
+    
+
+class SmsSender():
+    max_retry_count = 2
+    def __init__(self) -> None:
+        pass
+
+    def send(self, recipient: str, message: str) -> None:
+        attempt = 0
+        while attempt < self.max_retry_count:
+            try:
+                generate_response(1)
+                print("SMS Sent")
                 return
             except TransientError as err:
                 attempt += 1
@@ -47,7 +70,7 @@ class EmailSender():
 
 def notify(recipient, message):
     """Use the notify function directly in other places"""
-    sender = EmailSender()
+    sender = SmsSender()
     sender.send(recipient, message)
 
 
