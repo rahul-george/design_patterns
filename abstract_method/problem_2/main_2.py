@@ -10,7 +10,6 @@ Goal:
 """
 from abc import ABC, abstractmethod
 import random
-import smtplib
 
 
 class RetryFailedError(Exception):
