@@ -6,6 +6,7 @@ Goal:
 4. Add new notification channel - SMS 
 5. SMS notification channel also should have a retry. 
 6. retry is channel specific. 
+7. Refactor simple factory to factory method. 
 """
 from abc import ABC, abstractmethod
 import random
@@ -60,26 +61,24 @@ class NotificationManager:
     def __init__(self) -> None:
         pass
 
-    def create_sender(self, mode: str) -> NotificationSender:
-        """Delegated the creation of sender object based on the mode parameter to this simple factory"""
-        if mode == 'SMS':
-            sms_gateway = ''
-            api_key = ''
-            return SmsSender(sms_gateway, api_key)
-        elif mode == 'EMAIL':
-            mail_server = ''
-            api_key = ''
-            return EmailSender(mail_server, api_key)
-        else: 
-            raise NotImplementedError(f"{mode} notification channel is not implemented")
+    @abstractmethod
+    def create_sender(self) -> NotificationSender:
+        """Override the create sender in the specific manager classes to create it's instance. 
+        Converted from simple factory to factory method. 
+        Benefit: 
+        1. When new channels are added, the simple factory conditional need not change. 
+        2. Different creation workflows per product family. 
+        3. Client need not worry about the creation of Senders.         
+        """
+        pass
 
-    def notify(self, mode: str, recipient: str, message: str):
-        sender = self.create_sender(mode)
+    def notify(self, recipient: str, message: str):
+        sender = self.create_sender()
 
         attempt = 0
         while attempt < sender.max_retry_count:
             try:
-                generate_response(1)
+                generate_response(0)
                 sender.send(recipient, message)
                 return
             except TransientError as err:
@@ -88,12 +87,26 @@ class NotificationManager:
                 print(f"Retrying {attempt}/{sender.max_retry_count} times.. ")
         
         raise RetryFailedError("Exhausted all retry attempts")
+    
+
+class EmailNotificationMgr(NotificationManager):
+    def create_sender(self) -> NotificationSender:
+        mail_server = ''
+        api_key = ''
+        return EmailSender(mail_server, api_key)
+    
+
+class SmsNotificationMgr(NotificationManager):
+    def create_sender(self) -> NotificationSender:
+        sms_gateway = ''
+        api_key = ''
+        return SmsSender(sms_gateway, api_key)
         
 
 def notify(recipient, message):
     """Use the notify function directly in other places"""
-    notification_mgr = NotificationManager()
-    notification_mgr.notify('EMAIL', recipient, message)
+    notification_mgr = SmsNotificationMgr()
+    notification_mgr.notify(recipient, message)
 
 
 def main():
