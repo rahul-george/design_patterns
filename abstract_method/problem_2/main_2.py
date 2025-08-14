@@ -9,6 +9,7 @@ Goal:
 """
 from abc import ABC, abstractmethod
 import random
+import smtplib
 
 
 class RetryFailedError(Exception):
@@ -39,7 +40,7 @@ class NotificationSender(ABC):
 
 class EmailSender(NotificationSender):
     max_retry_count = 2
-    def __init__(self) -> None:
+    def __init__(self, server, api_key) -> None:
         pass
 
     def send(self, recipient: str, message: str) -> None:
@@ -48,7 +49,7 @@ class EmailSender(NotificationSender):
 
 class SmsSender(NotificationSender):
     max_retry_count = 2
-    def __init__(self) -> None:
+    def __init__(self, gateway, api_key) -> None:
         pass
 
     def send(self, recipient: str, message: str) -> None:
@@ -62,9 +63,13 @@ class NotificationManager:
     def create_sender(self, mode: str) -> NotificationSender:
         """Delegated the creation of sender object based on the mode parameter to this simple factory"""
         if mode == 'SMS':
-            return SmsSender()
+            sms_gateway = ''
+            api_key = ''
+            return SmsSender(sms_gateway, api_key)
         elif mode == 'EMAIL':
-            return EmailSender()
+            mail_server = ''
+            api_key = ''
+            return EmailSender(mail_server, api_key)
         else: 
             raise NotImplementedError(f"{mode} notification channel is not implemented")
 
