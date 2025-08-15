@@ -115,6 +115,8 @@ class FallbackNotificationMgr:
         self._managers = managers
     
     def notify(self, recipient: str, message: str):
+        """Uses the retry logic in existing individual sender classes.
+        This class only orchestrates the fallback."""
 
         for mgr in self._managers:
             print(f"Attempting to send via {mgr.__class__.__name__}")
