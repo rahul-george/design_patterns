@@ -28,7 +28,7 @@ class NotificationError(Exception):
     """Raised when failed to send notification through any channel"""
     pass
 
-def generate_response(user_choice=None):
+def generate_response(user_choice=None) -> str|Exception:
     """Function to simulate success/error responses"""
     choice = random.randint(0,2) if user_choice is None else user_choice
     if choice == 0:
@@ -42,7 +42,7 @@ def generate_response(user_choice=None):
 class NotificationSender(ABC):
     max_retry_count = 0
     @abstractmethod
-    def send(self, recipient, message):
+    def send(self, recipient, message) -> None:
         pass
 
 
@@ -52,7 +52,7 @@ class EmailSender(NotificationSender):
         pass
 
     def send(self, recipient: str, message: str) -> None:
-        generate_response(1)
+        generate_response(2)
         print("Email Sent")
     
 
@@ -62,7 +62,7 @@ class SmsSender(NotificationSender):
         pass
 
     def send(self, recipient: str, message: str) -> None:
-        generate_response(0)
+        generate_response(2)
         print("SMS Sent")
     
 
@@ -92,7 +92,7 @@ class NotificationManager(ABC):
                 print(f"Retrying {attempt}/{sender.max_retry_count} times.. ")
             except PermanentError as err:
                 print(f'Permanent error - skipping retries')
-                break
+                raise PermanentError(str(err))
         else:
             raise RetryFailedError("Exhausted all retry attempts")
     
@@ -114,7 +114,7 @@ class FallbackNotificationMgr:
     def __init__(self, managers: list[NotificationManager]) -> None:
         self._managers = managers
     
-    def notify(self, recipient: str, message: str):
+    def notify(self, recipient: str, message: str) -> None:
         """Uses the retry logic in existing individual sender classes.
         This class only orchestrates the fallback."""
 
@@ -123,6 +123,7 @@ class FallbackNotificationMgr:
 
             try:
                 mgr.notify(recipient, message)
+                return
             except (PermanentError, RetryFailedError) as err:
                 print(err)
                 print("Switching to the next notification channel")
