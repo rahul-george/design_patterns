@@ -13,15 +13,23 @@ import random
 
 
 class RetryFailedError(Exception):
+    """Raised when all retry attempts are exhausted."""
     pass
 
 class TransientError(Exception):
+    """Raised when temporary errors which can be recovered by retrying happens"""
     pass
 
 class PermanentError(Exception):
+    """Raised when a permanent failure occurs on any channel"""
+    pass
+
+class NotificationError(Exception):
+    """Raised when failed to send notification through any channel"""
     pass
 
 def generate_response(user_choice=None):
+    """Function to simulate success/error responses"""
     choice = random.randint(0,2) if user_choice is None else user_choice
     if choice == 0:
         return 'success'
@@ -76,15 +84,17 @@ class NotificationManager(ABC):
         attempt = 0
         while attempt < sender.max_retry_count:
             try:
-                generate_response(0)
                 sender.send(recipient, message)
                 return
             except TransientError as err:
                 attempt += 1
                 print("Ran into a temporary error")
                 print(f"Retrying {attempt}/{sender.max_retry_count} times.. ")
-        
-        raise RetryFailedError("Exhausted all retry attempts")
+            except PermanentError as err:
+                print(f'Permanent error - skipping retries')
+                break
+        else:
+            raise RetryFailedError("Exhausted all retry attempts")
     
 
 class EmailNotificationMgr(NotificationManager):
@@ -107,21 +117,15 @@ class FallbackNotificationMgr:
     def notify(self, recipient: str, message: str):
 
         for mgr in self._managers:
-            sender = mgr.create_sender()
-            print(f"Attempting to send via {sender.__class__.__name__}")
+            print(f"Attempting to send via {mgr.__class__.__name__}")
 
-            attempt = 0
-            while attempt < sender.max_retry_count:
-                try:
-                    sender.send(recipient, message)
-                    return
-                except TransientError as err:
-                    attempt += 1
-                    print("Ran into a temporary error")
-                    print(f"Retrying {attempt}/{sender.max_retry_count} times.. ")
-            
-            print("Exhausted all retry attempts")
-        raise PermanentError("All notification channels failed.")
+            try:
+                mgr.notify(recipient, message)
+            except (PermanentError, RetryFailedError) as err:
+                print(err)
+                print("Switching to the next notification channel")
+
+        raise NotificationError("All notification channels failed.")
         
 
 def notify(recipient, message):
