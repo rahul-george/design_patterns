@@ -1,145 +1,146 @@
+"""
+Goal: 
+1. Implement a notification system. 
+2. The notification system uses email as the notification channel. 
+3. If certain type of errors occur, the system should retry.
+4. Add new notification channel - SMS 
+5. SMS notification channel also should have a retry. 
+6. retry is channel specific. 
+7. Refactor simple factory to factory method. 
+"""
 from abc import ABC, abstractmethod
 import random
-import time
 
-# ------ Sender classes responsible for sending the SMS. ---------
-
-class NotificationSenderError(Exception):
-    pass
 
 class RetryFailedError(Exception):
+    """Raised when all retry attempts are exhausted."""
     pass
 
+class TransientError(Exception):
+    """Raised when temporary errors which can be recovered by retrying happens"""
+    pass
+
+class PermanentError(Exception):
+    """Raised when a permanent failure occurs on any channel"""
+    pass
+
+class NotificationError(Exception):
+    """Raised when failed to send notification through any channel"""
+    pass
+
+def generate_response(user_choice=None) -> str|Exception:
+    """Function to simulate success/error responses"""
+    choice = random.randint(0,2) if user_choice is None else user_choice
+    if choice == 0:
+        return 'success'
+    elif choice == 1:
+        raise TransientError("Recoverable error")
+    else:
+        raise PermanentError("Unrecoverable error")
+
+
 class NotificationSender(ABC):
-    retry_count = 1
+    max_retry_count = 0     # Individual senders handle the retry counts. 
     @abstractmethod
     def send(self, recipient, message) -> None:
-        """Business logic on how to send the notification 
-        resides with the inidividual notification senders"""
         pass
 
-class SmsSender(NotificationSender):
-    retry_count = 2
-
-    def send(self, recipient, message) -> None:
-        print("SMS Sent")
-            
 
 class EmailSender(NotificationSender):
-    retry_count = 3
-    def send(self, recipient, message) -> None:
-        print("Failed to send Email. time out")
-        raise NotificationSenderError("An error occured")
-
-class PushSender(NotificationSender):
-    def send(self, recipient, message) -> None:
-        print("Push notification sent")
-
-# --------- Manager classes responsible for instantiating the senders -------
-
-class NotificationManager(ABC):
-    def notify(self, recipient, message):
-        """The notify method implements the retry logic,
-          but the retry count itself is stored in the sender classes"""
-        sender = self.create_sender()
-        _retry = 0
-        while _retry < sender.retry_count:
-            try:   
-                sender.send(recipient, message)
-                break
-            except NotificationSenderError as Err:
-                _retry += 1
-                print(f"Retrying {_retry} times")
-        
-        if _retry == sender.retry_count:
-            raise RetryFailedError("Failed to send message, try another channel")
-
-    @abstractmethod
-    def create_sender(self) -> NotificationSender:
+    max_retry_count = 2
+    def __init__(self, server, api_key) -> None:
         pass
 
+    def send(self, recipient: str, message: str) -> None:
+        generate_response(2)
+        print("Email Sent")
+    
 
-class SmsNotificationManager(NotificationManager):
+class SmsSender(NotificationSender):
+    max_retry_count = 2
+    def __init__(self, gateway, api_key) -> None:
+        pass
+
+    def send(self, recipient: str, message: str) -> None:
+        generate_response(2)
+        print("SMS Sent")
+    
+
+class NotificationManager(ABC):
+    @abstractmethod
     def create_sender(self) -> NotificationSender:
-        return SmsSender()
+        """Override the create sender in the specific manager classes to create it's instance. 
+        Converted from simple factory to factory method. 
+        Benefit: 
+        1. When new channels are added, the simple factory conditional need not change. 
+        2. Different creation workflows per product family. 
+        3. Client need not worry about the creation of Senders.         
+        """
+        pass
 
+    def notify(self, recipient: str, message: str):
+        sender = self.create_sender()
 
-class EmailNotificationManager(NotificationManager):
+        attempt = 0
+        while attempt < sender.max_retry_count:
+            try:
+                sender.send(recipient, message)
+                return
+            except TransientError as err:
+                attempt += 1
+                print("Ran into a temporary error")
+                print(f"Retrying {attempt}/{sender.max_retry_count} times.. ")
+            except PermanentError as err:
+                print(f'Permanent error - skipping retries')
+                raise PermanentError(str(err))
+        else:
+            raise RetryFailedError("Exhausted all retry attempts")
+    
+
+class EmailNotificationMgr(NotificationManager):
     def create_sender(self) -> NotificationSender:
-        return EmailSender()
+        mail_server = ''
+        api_key = ''
+        return EmailSender(mail_server, api_key)
+    
 
-
-class PushNotificationManager(NotificationManager):
+class SmsNotificationMgr(NotificationManager):
     def create_sender(self) -> NotificationSender:
-        return PushSender()
+        sms_gateway = ''
+        api_key = ''
+        return SmsSender(sms_gateway, api_key)
 
-class FallbackNotifictionManager:
+class FallbackNotificationMgr:
     def __init__(self, managers: list[NotificationManager]) -> None:
         self._managers = managers
-
-    def _notify_with_simple_retry(self, mgr, recipient, message):
-        print('Using notify with simple retry algorithm')
-        attempt = 0
-        sender: NotificationSender = mgr.create_sender()
-
-        while attempt < sender.retry_count:
-            try:
-                attempt += 1
-                sender.send(recipient, message)
-                return
-            except NotificationSenderError as err:
-                # You can also create two classes one for retriable errors 
-                # and another for permanent errors
-                print(f"Attempt {attempt}/{sender.retry_count}. Retrying...")
-        
-        # If it comes here, it means it did not return
-        raise RetryFailedError("Out of retries")
     
-    def _notify_with_exponential_backoff_retry(self, mgr, recipient, message):
-        print('Using notify with exponential back off retry with jitter algorithm')
-        attempt = 0
-        sender: NotificationSender = mgr.create_sender()
+    def notify(self, recipient: str, message: str) -> None:
+        """Uses the retry logic in existing individual sender classes.
+        This class only orchestrates the fallback."""
 
-        while attempt < sender.retry_count:
-            try:
-                attempt += 1
-                sender.send(recipient, message)
-                return
-            except NotificationSenderError as err:
-                # You can also create two classes one for retriable errors 
-                # and another for permanent errors
-                print(f"Attempt {attempt}/{sender.retry_count}. Retrying...")
-                
-                remaining = sender.retry_count - attempt
-                if remaining:
-                    time.sleep(min(2**attempt, 8) + random.random())
-        
-        # If it comes here, it means it did not return
-        raise RetryFailedError("Out of retries")
-    
-    def notify(self, recipient, message):
         for mgr in self._managers:
+            print(f"Attempting to send via {mgr.__class__.__name__}")
+
             try:
-                # self._notify_with_simple_retry(mgr, recipient, message)
-                self._notify_with_exponential_backoff_retry(mgr, recipient, message)
-                return 
-            except RetryFailedError as err:
+                mgr.notify(recipient, message)
+                return
+            except (PermanentError, RetryFailedError) as err:
                 print(err)
-                print("Falling back to next channel")
+                print("Switching to the next notification channel")
+
+        raise NotificationError("All notification channels failed.")
+        
+
+def notify(recipient, message):
+    """Use the notify function directly in other places"""
+    notification_mgr = FallbackNotificationMgr([EmailNotificationMgr(), 
+                                                SmsNotificationMgr()])
+    notification_mgr.notify(recipient, message)
+
 
 def main():
-    # try:
-    #     sender = EmailNotificationManager()
-    #     sender.notify('', '')
-    # except RetryFailedError as err:
-    #     sender = SmsNotificationManager()
-    #     sender.notify('', '')
+    notify('', '')
 
-    # With fall back
-    sender_manager_with_fallback = FallbackNotifictionManager([
-        EmailNotificationManager(),
-        SmsNotificationManager()
-    ])
-    sender_manager_with_fallback.notify('', '')
 
-main()
+if __name__ == "__main__":
+    main()
