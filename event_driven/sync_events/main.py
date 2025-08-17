@@ -1,3 +1,4 @@
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from time import time
 
@@ -43,15 +44,42 @@ class BackgroundEvents:
                 print(future.result())
 
 
+class AsyncBackgroundEvents:
+    """Handles async methods as well"""
+    def __init__(self):
+        self._handlers = []     # We can add more information to the handlers
+        self.event_executor = ThreadPoolExecutor(max_workers=5)
+
+    def register(self, handler):
+        """Method to register new handlers for an event"""
+        self._handlers.append(handler)
+
+    async def dispatch(self, *event_args, **event_kwargs):
+        """Different events are run on parallel threads. Making it faster than Sync events. """
+        tasks = []
+        with self.event_executor as executor:
+            event_loop = asyncio.get_running_loop()
+            for handler in self._handlers:
+                if asyncio.iscoroutinefunction(handler):
+                    tasks.append(handler(*event_args, **event_kwargs))
+                else:
+                    tasks.append(event_loop.run_in_executor(executor, handler, *event_args, **event_kwargs))
+            
+            results = await asyncio.gather(*tasks)
+            # Iterate over the futures and handle exceptions or failures. 
+            for result in results:
+                print(result)
+    
+
 
 class Document:
     """Main document or event generator"""
     def __init__(self) -> None:
-        self.on_delete = SyncEvents()
+        self.on_delete = AsyncBackgroundEvents()
     
-    def delete_doc(self, doc_id: str):
+    async def delete_doc(self, doc_id: str):
         print("Document deleted")
-        self.on_delete.dispatch(doc_id)
+        await self.on_delete.dispatch(doc_id)
 
 
 class Logs:
@@ -59,7 +87,7 @@ class Logs:
     def __init__(self) -> None:
         pass
     
-    def delete_logs_by_doc_id(self, doc_id: str):
+    async def delete_logs_by_doc_id(self, doc_id: str):
         """Long running dependency"""
         i = 0
         while i<200000000: i+=1
@@ -78,7 +106,7 @@ class DocumentShareUrls:
         print("Deleted urls by document id")
 
 
-def main():
+async def main():
     doc = Document()
     logs = Logs()
     doc_urls = DocumentShareUrls()
@@ -86,9 +114,9 @@ def main():
     doc.on_delete.register(doc_urls.delete_urls_by_doc_id)
 
     start_time = time()
-    doc.delete_doc('1')
+    await doc.delete_doc('1')
     duration = time() - start_time
 
     print(f"Duration: {duration: .4f}s")
 
-main()
+asyncio.run(main())
