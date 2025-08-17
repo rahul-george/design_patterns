@@ -89,10 +89,8 @@ class Logs:
     
     async def delete_logs_by_doc_id(self, doc_id: str):
         """Long running dependency"""
-        i = 0
-        while i<200000000: i+=1
+        await asyncio.sleep(5)
         print("Deleted logs by document id")
-        return i
 
 class DocumentShareUrls:
     """Dependent class"""
